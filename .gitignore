@@ -13,10 +13,6 @@ Validation/
 TS/
 TL/
 
-# 모델 파일 (직접 학습시킨 모델 또는 다운로드한 모델)
-*.pth
-*.pt
-
 # Gradio 캐시 및 로그
 .gradio_cache/
 *.log
