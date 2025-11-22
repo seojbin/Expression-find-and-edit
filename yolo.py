@@ -14,6 +14,7 @@ def safe_load_wrapper(*args, **kwargs):
     return original_load(*args, **kwargs)
 torch.load = safe_load_wrapper
 
+
 # CPU/GPU 설정
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"추론 장치: {DEVICE}")
@@ -23,6 +24,7 @@ print(f"추론 장치: {DEVICE}")
 EMOTION_MODEL_PATH = 'emotion_model.pth' 
 NUM_CLASSES = 7
 CLASS_NAMES = ['Joy', 'Neutral', 'Surprise', 'Disgust', 'Sadness', 'Anger', 'Fear']
+
 
 # EfficientNet
 
@@ -78,7 +80,6 @@ cnn_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
-
 
 
 INPUT_IMAGE_PATH = 'test.jpg'  # 테스트할 이미지 경로

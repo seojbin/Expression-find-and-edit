@@ -50,7 +50,6 @@ NEGATIVE_PROMPT = "cartoon, anime, painting, blur, low quality, deformation, bad
 
 print("1. YOLO 모델 로딩 중 (Medium)...")
 try:
-    # [요청 반영] n(nano) 대신 m(medium) 사용
     faceDetector = YOLO('yolov8m-face.pt')
     faceDetector.to(device)
 except Exception as e:
