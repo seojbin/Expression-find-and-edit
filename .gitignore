@@ -1,22 +1,5 @@
-# Python 가상 환경 (사용자님 폴더 이름: face)
-face/
-
-# Python 캐시 파일
-__pycache__/
-*.pyc
-
-# 학습 데이터 및 원천 데이터 (절대 업로드 금지)
 Training/
 Validation/
-01.원천데이터/
-02.라벨링데이터/
-TS/
-TL/
-
-# Gradio 캐시 및 로그
-.gradio_cache/
-*.log
-
-# Windows/macOS 시스템 파일
-.DS_Store
-Thumbs.db
+face/
+Face_Data/
+.gradio/
