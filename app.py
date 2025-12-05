@@ -8,8 +8,6 @@ import numpy as np
 import diffusers.utils.logging
 import warnings
 import random
-
-# 안전한 torch.load 환경 설정
 original_load = torch.load
 def safe_load_wrapper(*args, **kwargs):
     if 'weights_only' not in kwargs:
@@ -26,7 +24,6 @@ from efficientnet_pytorch import EfficientNet
 warnings.filterwarnings('ignore')
 diffusers.utils.logging.set_verbosity_error()
 
-# --- 1. 초기 설정 ---
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -47,7 +44,6 @@ EMOTION_PROMPTS = {
 
 NEGATIVE_PROMPT = "cartoon, anime, painting, blur, low quality, deformation, bad anatomy, extra fingers, ugly, blurry, long chin, long face, 3d render"
 
-# --- 2. 모델 로드 ---
 
 print("1. YOLO 모델 로딩 중 (Medium)...")
 try:
@@ -78,12 +74,12 @@ try:
     cnnModel.load_state_dict(torch.load('emotion_model.pth', map_location=device))
     cnnModel = cnnModel.to(device)
     cnnModel.eval()
-    print("   -> 감정 분석 모델 로드 완료")
+    print("감정 분석 모델 로드 완료")
 except Exception as e:
-    print(f"   -> 감정 모델 로드 실패 (분석 기능 꺼짐): {e}")
+    print(f"감정 모델 로드 실패: {e}")
     cnnModel = None
 
-print("3. 생성 모델(RealVisXL) 및 Image Encoder 로딩 중...")
+print("3. 생성 모델(RealVisXL) 및 Image Encoder 로딩")
 try:
     image_encoder = CLIPVisionModelWithProjection.from_pretrained(
         "h94/IP-Adapter", 
@@ -104,14 +100,12 @@ try:
 
     pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
     pipe.enable_vae_tiling()
-    print("   -> 생성 모델 로드 완료")
+    print(" 생성 모델 로드 완료")
     
 except Exception as e:
     print(f"생성 모델 로드 실패: {e}")
     exit()
 
-
-# --- 3. 유틸리티 함수 ---
 
 def resizeWithPadding(image, targetSize=(224, 224)):
     oldSize = image.size
@@ -122,19 +116,16 @@ def resizeWithPadding(image, targetSize=(224, 224)):
     newIm.paste(image, ((targetSize[0] - newSize[0]) // 2, (targetSize[1] - newSize[1]) // 2))
     return newIm
 
-# 색상 정합 함수 (YCrCb 기반으로 수정하여 흰 픽셀 오류 방지 및 색상 보존력 향상)
+# 색상 정합 함수
 def match_color_stats(source_pil, target_pil):
     # PIL -> OpenCV RGB -> YCrCb (밝기 Y, 색상 Cr/Cb)
     source = cv2.cvtColor(np.array(source_pil), cv2.COLOR_RGB2YCrCb).astype(np.float32)
     target = cv2.cvtColor(np.array(target_pil), cv2.COLOR_RGB2YCrCb).astype(np.float32)
 
     # 통계 계산
-    # Y 채널은 보존하고 Cr/Cb 채널(색상)만 매칭하는 것이 안전함.
-    # 하지만 여기서는 전체 3채널(YCrCb) 모두 매칭하여 색상 불일치를 최대한 해결합니다.
     source_mean, source_std = cv2.meanStdDev(source)
     target_mean, target_std = cv2.meanStdDev(target)
     
-    # 평균 및 표준편차 매칭
     result = source.copy()
     for i in range(3): # Y, Cr, Cb 채널별 적용
         # 표준편차가 0인 경우 나누기 오류 방지
@@ -142,14 +133,14 @@ def match_color_stats(source_pil, target_pil):
             # 표준편차 정규화 및 평균 이동
             result[:,:,i] = (result[:,:,i] - source_mean[i]) * (target_std[i] / source_std[i]) + target_mean[i]
         
-    # 클리핑 (0~255) 및 데이터 타입 변환
+    # 데이터 타입 변환
     result = np.clip(result, 0, 255).astype(np.uint8)
     
     # YCrCb -> RGB -> PIL
     return Image.fromarray(cv2.cvtColor(result, cv2.COLOR_YCrCb2RGB))
 
 
-# 특정 감정 점수 가져오기
+# 감정 점수 가져오기
 def getEmotionScore(facePil, targetEmotion=None):
     if cnnModel is None: return "N/A", 0.0
     try:
@@ -159,13 +150,13 @@ def getEmotionScore(facePil, targetEmotion=None):
             outputs = cnnModel(inputTensor)
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
             
-            # 1. 특정 목표 감정(targetEmotion)의 점수 반환
+            # 점수 반환
             if targetEmotion and targetEmotion in classNames:
                 target_idx = classNames.index(targetEmotion)
                 score = probabilities[0][target_idx].item()
                 return targetEmotion, score
             
-            # 2. 아니면 가장 높은 감정 반환
+            # 아니면 가장 높은 감정 반환
             else:
                 confidences, indices = torch.topk(probabilities, 1, dim=1)
                 score = confidences.item()
@@ -179,7 +170,7 @@ def analyzeImage(inputPilImage):
     frame = cv2.cvtColor(np.array(inputPilImage), cv2.COLOR_RGB2BGR)
     h, w = frame.shape[:2]
     
-    # 이미지 크기에 따른 스케일 팩터 계산
+    # 이미지 크기에 따른 스케일
     scaleFactor = max(h, w) / 1000.0
     thickness = max(2, int(1 * scaleFactor))
     fontScale = max(0.8, 0.5 * scaleFactor)
@@ -195,13 +186,13 @@ def analyzeImage(inputPilImage):
         for box in result.boxes:
             confidence = box.conf[0].cpu().numpy()
             
-            # 1. 신뢰도 필터링
+            # 신뢰도 필터링
             if confidence < min_confidence:
                  continue
             
             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
             
-            # 2. 박스 크기 필터링
+            # 박스 크기 필터링
             face_area = (x2 - x1) * (y2 - y1)
             if face_area < min_face_area:
                 continue
@@ -211,18 +202,18 @@ def analyzeImage(inputPilImage):
             
             label, score = getEmotionScore(facePil)
             
-            # 1. 얼굴 박스 그리기
+            # 얼굴 박스 그리기
             cv2.rectangle(annotatedFrame, (x1, y1), (x2, y2), (0, 255, 0), thickness)
             
             text = f"{label} {score*100:.0f}%"
             
-            # 2. 텍스트 크기 계산
+            # 텍스트 크기
             (textW, textH), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, thickness)
             
-            # 3. 글자 배경 박스 그리기 (초록색 채움)
+            # 글자 배경 박스 
             cv2.rectangle(annotatedFrame, (x1, y1 - textH - int(10*scaleFactor) - 5), (x1 + textW + 10, y1), (0, 255, 0), -1)
             
-            # 4. 텍스트 그리기 (검은색 글씨)
+            # 텍스트 그리기
             cv2.putText(annotatedFrame, text, (x1 + 5, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, fontScale, (0, 0, 0), thickness)
             
     return Image.fromarray(cv2.cvtColor(annotatedFrame, cv2.COLOR_BGR2RGB))
@@ -231,8 +222,6 @@ def analyzeImage(inputPilImage):
 def processUploadedImage(image):
     return image, analyzeImage(image)
 
-
-# --- 4. 핵심 변환 로직 ---
 
 def selectAndChange(originalImage, targetEmotion, evt: gr.SelectData, progress=gr.Progress(track_tqdm=True)):
     if originalImage is None: return None, "이미지를 먼저 업로드해주세요"
@@ -267,16 +256,16 @@ def selectAndChange(originalImage, targetEmotion, evt: gr.SelectData, progress=g
                 break
         if clickedBox: break
             
-    if clickedBox is None: return originalImage, "클릭 위치에서 유효한 얼굴을 찾을 수 없습니다."
+    if clickedBox is None: return originalImage, "클릭 위치에서 얼굴을 찾을 수 없습니다."
     
     bx1, by1, bx2, by2 = clickedBox
     
-    # 2. 변환 전 '목표 감정' 점수 측정
+    # 변환 전 점수ㅜ
     ori_face_bgr = frameBgr[by1:by2, bx1:bx2]
     ori_face_pil = Image.fromarray(cv2.cvtColor(ori_face_bgr, cv2.COLOR_BGR2RGB))
     _, before_target_score = getEmotionScore(ori_face_pil, targetEmotion=targetEmotion)
     
-    # 3. 얼굴 Crop
+    # 얼굴 Crop
     face_w, face_h = bx2 - bx1, by2 - by1
     cx, cy = bx1 + face_w // 2, by1 + face_h // 2
     size = int(max(face_w, face_h) * 1.8)
@@ -289,25 +278,25 @@ def selectAndChange(originalImage, targetEmotion, evt: gr.SelectData, progress=g
     crop_img_bgr = frameBgr[crop_y1:crop_y2, crop_x1:crop_x2]
     crop_pil = Image.fromarray(cv2.cvtColor(crop_img_bgr, cv2.COLOR_BGR2RGB))
 
-    # 4. 리사이즈 (768px)
+    # 리사이즈 768px
     process_size = (768, 768) 
     resized_face = crop_pil.resize(process_size, Image.Resampling.LANCZOS)
     
-    # 5. 마스크 생성
+    # 마스크 생성
     mask = Image.new("L", process_size, 0)
     draw = ImageDraw.Draw(mask)
     
-    # 0.45 지점부터 아래쪽을 칠함 (눈 보존, 하관 변형)
+    # 0.45 지점부터 아래쪽
     mask_start_y = int(process_size[1] * 0.45)
     draw.rectangle([0, mask_start_y, process_size[0], process_size[1]], fill=255)
     mask = mask.filter(ImageFilter.GaussianBlur(radius=30))
 
-    # 6. 프롬프트
+    # 프롬
     prompt = f"close-up photo of a person, {EMOTION_PROMPTS[targetEmotion]}, high quality, 8k, raw photo, realistic skin texture"
     neg_prompt = NEGATIVE_PROMPT
 
-    # 7. 생성
-    progress(0.4, desc="표정 생성 중...")
+    # 생성
+    progress(0.4, desc="표정 생성 중")
     generator = torch.Generator(device).manual_seed(random.randint(0, 999999))
     
     with torch.inference_mode():
@@ -323,9 +312,8 @@ def selectAndChange(originalImage, targetEmotion, evt: gr.SelectData, progress=g
             generator=generator
         ).images[0]
         
-    # 8. 합성
     
-    # 색상 정합 수행
+    # 색상맞추기
     restored_face_resized = generated_face.resize(crop_pil.size, Image.Resampling.LANCZOS)
     color_matched_face = match_color_stats(restored_face_resized, crop_pil)
     
@@ -344,13 +332,13 @@ def selectAndChange(originalImage, targetEmotion, evt: gr.SelectData, progress=g
     
     _, after_target_score = getEmotionScore(modified_pil, targetEmotion=targetEmotion)
     
-    # 결과 메시지: 목표 감정 점수 변화량 표시
+    # 결과 메시지
     msg = f"완료: {targetEmotion} ({before_target_score*100:.1f}% → {after_target_score*100:.1f}%)"
     
     return final_image, msg
 
 
-# --- UI ---
+# UI!!
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("# AI 표정 변환기")
@@ -370,5 +358,5 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     imageDisplay.select(fn=selectAndChange, inputs=[originalImageState, emotionDropdown], outputs=[imageOutput, textOutput])
 
 if __name__ == "__main__":
-    print("UI 실행 중...")
+    print("UI 실행 중")
     demo.launch(share=False)

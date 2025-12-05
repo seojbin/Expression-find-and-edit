@@ -19,8 +19,7 @@ torch.load = safe_load_wrapper
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"추론 장치: {DEVICE}")
 
-# 학습된 CNN (감정 분류기) 경로 설정
-# 주의: 이전에 학습시킨 파일명이 'emotion_model.pth'였다면 그 이름을 써야 합니다.
+#경로 설정
 EMOTION_MODEL_PATH = 'emotion_model.pth' 
 NUM_CLASSES = 7
 CLASS_NAMES = ['Joy', 'Neutral', 'Surprise', 'Disgust', 'Sadness', 'Anger', 'Fear']
@@ -59,22 +58,22 @@ except Exception as e:
     print(f"모델 구조 불일치 또는 로드 오류: {e}")
     exit()
 
-# YOLOv8 로드 (얼굴 검출용)
+# YOLOv8 로드
 try:
-    # n(nano)보다 성능이 좋은 m(medium) 모델 사용 권장
+    # n보다 성능좋은 m모델
     face_detector = YOLO('yolov8m-face.pt') 
     face_detector.to(DEVICE)
     print("YOLOv8 얼굴 검출기 로드 완료.")
 except Exception as e:
-    print(f"YOLO 로드 실패, yolov8n-face.pt로 재시도...")
+    print(f"YOLO 로드 실패, yolov8n-face.pt 재시도")
     try:
         face_detector = YOLO('yolov8n-face.pt')
         face_detector.to(DEVICE)
     except:
-        print("YOLO 모델을 찾을 수 없습니다. pip install ultralytics 확인 필요.")
+        print("pip install ultralytics 확인 필요.")
         exit()
 
-# CNN 입력을 위한 전처리 (학습 때와 동일하게)
+# CNN 입력을 위한 전처리
 cnn_transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -169,11 +168,9 @@ for result in results:
 # 결과 저장 및 출력
 cv2.imwrite(OUTPUT_IMAGE_PATH, frame)
 print(f"추론 완료. 결과가 '{OUTPUT_IMAGE_PATH}' 에 저장되었습니다.")
-
-# 서버 환경(Colab 등)이 아닐 때만 창 띄우기
 try:
     cv2.imshow('Emotion Detection Result', frame)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 except:
-    print("화면 출력(cv2.imshow)을 건너뜁니다. (저장된 파일 확인 필요)")
+    print("화면 출력(cv2.imshow)을 건너뜁니다.")
