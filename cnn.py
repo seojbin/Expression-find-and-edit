@@ -25,7 +25,6 @@ CLASS_TO_IDX = {
 }
 NUM_CLASSES = 7
 
-# --- 1. 전처리 함수 ---
 def preprocess_data(source_root, target_root, split_name):
     save_dir = os.path.join(target_root, split_name)
     
@@ -119,7 +118,6 @@ def preprocess_data(source_root, target_root, split_name):
     print(f"[{split_name}] Processed: {processed_count}")
 
 
-# --- 2. 데이터셋 ---
 class SimpleEmotionDataset(Dataset):
     def __init__(self, root_dir, split, transform=None):
         self.root_dir = os.path.join(root_dir, split)
@@ -150,7 +148,6 @@ class SimpleEmotionDataset(Dataset):
         except Exception:
             return torch.zeros((3, 224, 224)), label
 
-# --- 3. 모델 ---
 def create_model(num_classes=7):
     model = EfficientNet.from_pretrained('efficientnet-b0')
     in_features = model._fc.in_features
@@ -160,7 +157,6 @@ def create_model(num_classes=7):
     )
     return model
 
-# --- 4. 메인 ---
 if __name__ == '__main__':
     
     preprocess_data(ORIGINAL_TRAIN_DIR, PROCESSED_ROOT_DIR, 'Training')
